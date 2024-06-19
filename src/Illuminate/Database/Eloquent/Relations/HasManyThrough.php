@@ -112,7 +112,7 @@ class HasManyThrough extends Relation
 
         $this->performJoin();
 
-        if (static::$constraints) {
+        if ($this->constrained) {
             $this->query->where($this->getQualifiedFirstKeyName(), '=', $localValue);
         }
     }

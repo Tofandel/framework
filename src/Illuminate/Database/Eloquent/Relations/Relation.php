@@ -12,6 +12,7 @@ use Illuminate\Database\MultipleRecordsFoundException;
 use Illuminate\Database\Query\Expression;
 use Illuminate\Support\Traits\ForwardsCalls;
 use Illuminate\Support\Traits\Macroable;
+use Throwable;
 
 abstract class Relation implements BuilderContract
 {
@@ -55,6 +56,14 @@ abstract class Relation implements BuilderContract
     protected static $constraints = true;
 
     /**
+     * Indicates if we should constrain relationships after the constructor has been called.
+     */
+    protected static bool $shouldRestoreConstraints = false;
+
+    /** Stores whether the relationship should be constrained or not */
+    protected bool $constrained = false;
+
+    /**
      * An array to map class names to their morph names in the database.
      *
      * @var array
@@ -88,7 +97,13 @@ abstract class Relation implements BuilderContract
         $this->parent = $parent;
         $this->related = $query->getModel();
 
+        $this->constrained = static::$constraints;
+
         $this->addConstraints();
+
+        if (static::$shouldRestoreConstraints) {
+            static::$constraints = true;
+        }
     }
 
     /**
@@ -110,6 +125,19 @@ abstract class Relation implements BuilderContract
             return $callback();
         } finally {
             static::$constraints = $previous;
+        }
+    }
+
+    public static function noConstraintsForNextRelation(Closure $callback)
+    {
+        static::$shouldRestoreConstraints = static::$constraints;
+        static::$constraints = false;
+
+        try {
+            return $callback();
+        } catch (Throwable $e) {
+            static::$constraints = static::$shouldRestoreConstraints;
+            throw $e;
         }
     }
 
